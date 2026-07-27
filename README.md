@@ -57,7 +57,7 @@ steam-dashboard/
 - [x] Publish project to GitHub
 - [x] Automatically discover hardware sensors
 - [x] CPU and GPU utilization
-- [ ] Memory monitoring
+- [x] Memory monitoring
 - [ ] Fan monitoring
 - [ ] Dashboard UI
 - [ ] Gaming mode
