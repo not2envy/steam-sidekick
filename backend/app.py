@@ -7,6 +7,46 @@ logger = logging.getLogger("uvicorn")
 
 app = FastAPI(title="Steam Sidekick API")
 
+def find_amd_gpu_card():
+    """
+    Dynamically scans /sys/class/drm to locate the correct AMD GPU card index.
+    Returns the base path string (e.g., '/sys/class/drm/card0') or None if not found.
+    """
+    base_drm_path = "/sys/class/drm"
+    amd_vendor_id = "0x1002"
+    
+    # 1. Safety check to ensure the DRM directory exists on the system
+    if not os.path.isdir(base_drm_path):
+        return None
+
+    try:
+        # 2. List all items in the DRM directory
+        for entry in os.listdir(base_drm_path):
+            # Target only entries that look exactly like 'card0', 'card1', etc.
+            # This ignores 'card1-DP-1', 'renderD128', and display interfaces.
+            if entry.startswith("card") and "-" not in entry:
+                vendor_path = os.path.join(base_drm_path, entry, "device/vendor")
+                
+                # 3. Check if this card entry has a device/vendor hardware file
+                if os.path.isfile(vendor_path):
+                    try:
+                        with open(vendor_path, "r") as f:
+                            # Strip whitespace and normalize to lowercase for clean matching
+                            vendor_id = f.read().strip().lower()
+                            
+                        # 4. If it matches the AMD Vendor ID, we found our GPU
+                        if vendor_id == amd_vendor_id:
+                            return os.path.join(base_drm_path, entry)
+                    except Exception:
+                        continue  # Skip to the next card if a file is unreadable (e.g., permission issue)
+                        
+    except Exception:
+        return None
+        
+    return None  # Return None if no AMD GPU card was discovered
+
+# Run the discovery once at startup.
+_AMD_GPU_BASE = find_amd_gpu_card()
 
 def read_temp(path):
     try:
@@ -15,6 +55,12 @@ def read_temp(path):
     except Exception:
         return None
 
+def find_gpu_info(sensor_name):
+    # Seamlessly build the path using the cached base path
+    if _AMD_GPU_BASE is None:
+        return None
+
+    return os.path.join(_AMD_GPU_BASE, "device", sensor_name)
 
 def find_hwmon(sensor_name):
     hwmon_root = "/sys/class/hwmon"
@@ -30,9 +76,6 @@ def find_hwmon(sensor_name):
             continue
 
     return None
-
-def find_gpu_info(sensor_name):
-    return f"/sys/class/drm/card1/device/{sensor_name}"
 
 def get_cpu_temperature():
     cpu_hwmon = find_hwmon("k10temp")
@@ -99,6 +142,9 @@ def get_gpu_temperature():
         }
 
 def read_gpu_stats(path):
+    if path is None:
+        return None
+
     try:
         with open(path, "r") as f:
             return int(f.read().strip())
@@ -123,9 +169,6 @@ def get_gpu_metric(sensor_name, metric_key, error_message):
     # 4. Success path returning a structured dictionary
     return {metric_key: value}
 
-
-# --- Your Cleaned Public Functions ---
-
 def get_gpu_usage():
     return get_gpu_metric(
         sensor_name="gpu_busy_percent",
@@ -142,11 +185,17 @@ def get_gpu_memory_usage():
 
 @app.get("/")
 def root():
+    print("Starting request...")
     usage = get_cpu_usage()
+    print("CPU usage OK")
     cpu_temp = get_cpu_temperature()
+    print("CPU temp OK")
     gpu_temp = get_gpu_temperature()
+    print("GPU temp OK")
     gpu_usage = get_gpu_usage()
+    print("GPU usage OK")
     gpu_memory = get_gpu_memory_usage()
+    print("GPU memory OK")
 
     return {
         "cpu": {
@@ -159,16 +208,3 @@ def root():
             "memory": gpu_memory["gpu_memory_usage"]
         }
     } 
-
-    # return {
-        
-    #     "cpu": {
-    #         "temperature": read_temp(f"{cpu_hwmon}/temp1_input")
-    #     },
-    #     "gpu": {
- 	#    "edge": read_temp(f"{gpu_hwmon}/temp1_input"),
-   	#    "junction": read_temp(f"{gpu_hwmon}/temp2_input"),
-    #    "memory": read_temp(f"{gpu_hwmon}/temp3_input")
-
-    #     }
-    # }
