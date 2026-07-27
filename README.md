@@ -55,7 +55,7 @@ steam-dashboard/
 - [x] Read CPU and GPU temperatures
 - [x] Containerize backend
 - [x] Publish project to GitHub
-- [ ] Automatically discover hardware sensors
+- [x] Automatically discover hardware sensors
 - [ ] CPU and GPU utilization
 - [ ] Memory monitoring
 - [ ] Fan monitoring
