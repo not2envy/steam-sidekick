@@ -82,15 +82,32 @@ def get_cpu_usage():
         "cpu_usage": round(cpu_usage, 1)
     }
 
+def get_gpu_temperature():
+    gpu_hwmon = find_hwmon("amdgpu")
+    
+    if gpu_hwmon is None:
+        return {
+            "error": "GPU sensor not found"
+        }
+    
+    return { 
+        "gpu_temperature": read_temp(f"{gpu_hwmon}/temp1_input")
+            
+        }
+
 @app.get("/")
 def root():
-    # cpu_hwmon = find_hwmon("k10temp")
-    # gpu_hwmon = find_hwmon("amdgpu")
+    usage = get_cpu_usage()
+    cpu_temp = get_cpu_temperature()
+    gpu_temp = get_gpu_temperature()
 
     return {
         "cpu": {
-            "usage":get_cpu_usage()["cpu_usage"],
-            "temperature":get_cpu_temperature()["cpu_temperature"]
+            "usage":usage["cpu_usage"],
+            "temperature":cpu_temp["cpu_temperature"]
+        },
+        "gpu": {
+            "temperature": gpu_temp["gpu_temperature"]
         }
     } 
 
