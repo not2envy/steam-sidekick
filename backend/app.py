@@ -31,8 +31,8 @@ def find_hwmon(sensor_name):
 
     return None
 
-def find_gpu():
-    return "/sys/class/drm/card1/device/gpu_busy_percent"
+def find_gpu_info(sensor_name):
+    return f"/sys/class/drm/card1/device/{sensor_name}"
 
 def get_cpu_temperature():
     cpu_hwmon = find_hwmon("k10temp")
@@ -98,22 +98,47 @@ def get_gpu_temperature():
             
         }
 
-def read_gpu_usage(path):
+def read_gpu_stats(path):
     try:
         with open(path, "r") as f:
             return int(f.read().strip())
     except Exception:
         return None
 
+def get_gpu_metric(sensor_name, metric_key, error_message):
+    """
+    Reads a GPU metric from the Linux sysfs interface and returns
+    either the metric value or an error dictionary.
+    """
+    # 1. Generate the string path
+    path = find_gpu_info(sensor_name)
+    
+    # 2. Attempt to read and parse the file contents
+    value = read_gpu_stats(path)
+    
+    # 3. Handle errors based purely on the returned value
+    if value is None:
+        return {"error": error_message}
+        
+    # 4. Success path returning a structured dictionary
+    return {metric_key: value}
+
+
+# --- Your Cleaned Public Functions ---
+
 def get_gpu_usage():
-    gpu_drm = find_gpu()
-    if gpu_drm is None:
-        return{
-            "error": "GPU sensor not found"
-        }
-    return {
-        "gpu_usage": read_gpu_usage(gpu_drm)
-    }
+    return get_gpu_metric(
+        sensor_name="gpu_busy_percent",
+        metric_key="gpu_usage",
+        error_message="GPU sensor statistic could not be read"
+    )
+
+def get_gpu_memory_usage():
+    return get_gpu_metric(
+        sensor_name="mem_busy_percent",
+        metric_key="gpu_memory_usage",
+        error_message="GPU memory statistic could not be read"
+    )
 
 @app.get("/")
 def root():
@@ -121,6 +146,7 @@ def root():
     cpu_temp = get_cpu_temperature()
     gpu_temp = get_gpu_temperature()
     gpu_usage = get_gpu_usage()
+    gpu_memory = get_gpu_memory_usage()
 
     return {
         "cpu": {
@@ -129,7 +155,8 @@ def root():
         },
         "gpu": {
             "temperature": gpu_temp["gpu_temperature"],
-            "usage": gpu_usage["gpu_usage"]
+            "usage": gpu_usage["gpu_usage"],
+            "memory": gpu_memory["gpu_memory_usage"]
         }
     } 
 
