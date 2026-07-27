@@ -31,6 +31,19 @@ def find_hwmon(sensor_name):
 
     return None
 
+def get_cpu_temperature():
+    cpu_hwmon = find_hwmon("k10temp")
+
+    if cpu_hwmon is None:
+        return {
+            "error": "CPU sensor not found"
+        }
+
+    return { 
+        "cpu_temperature": read_temp(f"{cpu_hwmon}/temp1_input")
+            
+        }
+
 def read_cpu_times():
         path = "/proc/stat"
         try:
@@ -74,7 +87,12 @@ def root():
     # cpu_hwmon = find_hwmon("k10temp")
     # gpu_hwmon = find_hwmon("amdgpu")
 
-    return get_cpu_usage()
+    return {
+        "cpu": {
+            "usage":get_cpu_usage()["cpu_usage"],
+            "temperature":get_cpu_temperature()["cpu_temperature"]
+        }
+    } 
 
     # return {
         
