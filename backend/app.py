@@ -31,6 +31,9 @@ def find_hwmon(sensor_name):
 
     return None
 
+def find_gpu():
+    return "/sys/class/drm/card1/device/gpu_busy_percent"
+
 def get_cpu_temperature():
     cpu_hwmon = find_hwmon("k10temp")
 
@@ -95,11 +98,29 @@ def get_gpu_temperature():
             
         }
 
+def read_gpu_usage(path):
+    try:
+        with open(path, "r") as f:
+            return int(f.read().strip())
+    except Exception:
+        return None
+
+def get_gpu_usage():
+    gpu_drm = find_gpu()
+    if gpu_drm is None:
+        return{
+            "error": "GPU sensor not found"
+        }
+    return {
+        "gpu_usage": read_gpu_usage(gpu_drm)
+    }
+
 @app.get("/")
 def root():
     usage = get_cpu_usage()
     cpu_temp = get_cpu_temperature()
     gpu_temp = get_gpu_temperature()
+    gpu_usage = get_gpu_usage()
 
     return {
         "cpu": {
@@ -107,7 +128,8 @@ def root():
             "temperature":cpu_temp["cpu_temperature"]
         },
         "gpu": {
-            "temperature": gpu_temp["gpu_temperature"]
+            "temperature": gpu_temp["gpu_temperature"],
+            "usage": gpu_usage["gpu_usage"]
         }
     } 
 
