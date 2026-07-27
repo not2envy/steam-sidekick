@@ -56,7 +56,7 @@ steam-dashboard/
 - [x] Containerize backend
 - [x] Publish project to GitHub
 - [x] Automatically discover hardware sensors
-- [ ] CPU and GPU utilization
+- [x] CPU and GPU utilization
 - [ ] Memory monitoring
 - [ ] Fan monitoring
 - [ ] Dashboard UI
