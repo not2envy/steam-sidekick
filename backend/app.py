@@ -183,28 +183,43 @@ def get_gpu_memory_usage():
         error_message="GPU memory statistic could not be read"
     )
 
+def get_cpu_metrics():
+    usage = get_cpu_usage()
+    cpu_temp = get_cpu_temperature()
+    return {
+        "usage":usage["cpu_usage"],
+        "temperature":cpu_temp["cpu_temperature"]
+    }
+
+def get_gpu_metrics():
+    gpu_temp = get_gpu_temperature()
+    gpu_usage = get_gpu_usage()
+    gpu_memory = get_gpu_memory_usage()
+
+    return{
+        "temperature": gpu_temp["gpu_temperature"],
+        "usage": gpu_usage["gpu_usage"],
+        "memory": gpu_memory["gpu_memory_usage"]
+    }
+
 @app.get("/")
 def root():
-    print("Starting request...")
-    usage = get_cpu_usage()
-    print("CPU usage OK")
-    cpu_temp = get_cpu_temperature()
-    print("CPU temp OK")
-    gpu_temp = get_gpu_temperature()
-    print("GPU temp OK")
-    gpu_usage = get_gpu_usage()
-    print("GPU usage OK")
-    gpu_memory = get_gpu_memory_usage()
-    print("GPU memory OK")
-
     return {
-        "cpu": {
-            "usage":usage["cpu_usage"],
-            "temperature":cpu_temp["cpu_temperature"]
-        },
-        "gpu": {
-            "temperature": gpu_temp["gpu_temperature"],
-            "usage": gpu_usage["gpu_usage"],
-            "memory": gpu_memory["gpu_memory_usage"]
-        }
-    } 
+        "message": "Steam Sidekick API",
+        "version": "0.1.0"
+    }
+
+@app.get("/cpu")
+def read_cpu_metrics():
+    return get_cpu_metrics()
+    
+@app.get("/gpu")
+def read_gpu_metrics():
+    return get_gpu_metrics()
+
+@app.get("/system")
+def read_system_metrics():
+    return {
+        "cpu": get_cpu_metrics(),
+        "gpu": get_gpu_metrics()
+    }
