@@ -1,6 +1,8 @@
 import os
 import time
 
+from backend.models.metrics import CpuMetrics, GpuMetrics
+
 def find_amd_gpu_card():
     """
     Dynamically scans /sys/class/drm to locate the correct AMD GPU card index.
@@ -177,21 +179,20 @@ def get_gpu_memory_usage():
         error_message="GPU memory statistic could not be read"
     )
 
-def get_cpu_metrics():
+def get_cpu_metrics() -> CpuMetrics:
     usage = get_cpu_usage()
     cpu_temp = get_cpu_temperature()
-    return {
-        "usage":usage["cpu_usage"],
-        "temperature":cpu_temp["cpu_temperature"]
-    }
+    return CpuMetrics(
+        usage=usage["cpu_usage"],
+        temperature=cpu_temp["cpu_temperature"]
+        )
 
-def get_gpu_metrics():
+def get_gpu_metrics() -> GpuMetrics:
     gpu_temp = get_gpu_temperature()
     gpu_usage = get_gpu_usage()
     gpu_memory = get_gpu_memory_usage()
-
-    return{
-        "temperature": gpu_temp["gpu_temperature"],
-        "usage": gpu_usage["gpu_usage"],
-        "memory": gpu_memory["gpu_memory_usage"]
-    }
+    return GpuMetrics(
+        temperature=gpu_temp["gpu_temperature"],
+        usage=gpu_usage["gpu_usage"],
+        memory=gpu_memory["gpu_memory_usage"]
+    )
