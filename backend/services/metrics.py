@@ -1,7 +1,7 @@
 import os
 import time
 
-from backend.models.metrics import CpuMetrics, GpuMetrics
+from models.metrics import CpuMetrics, GpuMetrics
 
 def find_amd_gpu_card():
     """
