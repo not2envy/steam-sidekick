@@ -3,6 +3,12 @@ import time
 
 from models.metrics import CpuMetrics, GpuMetrics
 
+def get_vendor_id(vendor_path):
+    with open(vendor_path, "r") as f:
+            # Strip whitespace and normalize to lowercase for clean matching
+            vendor_id = f.read().strip().lower()
+    return vendor_id
+
 def find_amd_gpu_card():
     """
     Dynamically scans /sys/class/drm to locate the correct AMD GPU card index.
@@ -26,9 +32,7 @@ def find_amd_gpu_card():
                 # 3. Check if this card entry has a device/vendor hardware file
                 if os.path.isfile(vendor_path):
                     try:
-                        with open(vendor_path, "r") as f:
-                            # Strip whitespace and normalize to lowercase for clean matching
-                            vendor_id = f.read().strip().lower()
+                        vendor_id =get_vendor_id(vendor_path)
                             
                         # 4. If it matches the AMD Vendor ID, we found our GPU
                         if vendor_id == amd_vendor_id:
@@ -73,18 +77,23 @@ def find_hwmon(sensor_name):
 
     return None
 
+def get_hardware_temperature(sensor_name,temperature_key,device_name):
+    sensor_path = find_hwmon(sensor_name)
+    if sensor_path is None:
+        raise RuntimeError(f"{device_name} sensor could not be read")
+    
+    temperature = read_temp(f"{sensor_path}/temp1_input")
+    if temperature is None:
+        raise RuntimeError(f"{device_name} temperature could not be read")
+
+    return {temperature_key: temperature}
+
 def get_cpu_temperature():
-    cpu_hwmon = find_hwmon("k10temp")
-
-    if cpu_hwmon is None:
-        return {
-            "error": "CPU sensor not found"
-        }
-
-    return { 
-        "cpu_temperature": read_temp(f"{cpu_hwmon}/temp1_input")
-            
-        }
+    return get_hardware_temperature(
+        sensor_name="k10temp",
+        temperature_key="cpu_temperature",
+        device_name="CPU"
+    )
 
 def read_cpu_times():
         path = "/proc/stat"
@@ -96,17 +105,29 @@ def read_cpu_times():
             return None
         return None
 
+def get_cpu_time_readings():
+    cpu_times = read_cpu_times()
+    
+    if cpu_times is None:
+        raise RuntimeError("CPU times could not be read")
+    return cpu_times
+
 def get_cpu_usage():
-    # 1. Read raw string data and immediately convert values to integers (skipping "cpu")
-    first = [int(x) for x in read_cpu_times()[1:]]
+
+    cpu_times = get_cpu_time_readings()
+    
+    # Read raw string data and immediately convert values to integers (skipping "cpu")
+    first = [int(x) for x in cpu_times[1:]]
     
     # Wait for the sample interval
     time.sleep(0.1)
+
+    cpu_times = get_cpu_time_readings()
+
+    # Read second sample and immediately convert to integers (skipping "cpu")
+    second = [int(x) for x in cpu_times[1:]]
     
-    # 2. Read second sample and immediately convert to integers (skipping "cpu")
-    second = [int(x) for x in read_cpu_times()[1:]]
-    
-    # 3. Perform calculations using pure integer arrays
+    # Perform calculations using pure integer arrays
     # Note: Index 3 corresponds to the original index 4 ("idle") because we sliced off "cpu"
     idle_diff = second[3] - first[3]
     
@@ -114,7 +135,7 @@ def get_cpu_usage():
     diffs = [b - a for a, b in zip(first, second)]
     grand_total = sum(diffs)
     
-    # 4. Prevent division-by-zero error
+    # Prevent division-by-zero error
     if grand_total:
         cpu_usage = (grand_total - idle_diff) / grand_total * 100
     else:
@@ -125,17 +146,11 @@ def get_cpu_usage():
     }
 
 def get_gpu_temperature():
-    gpu_hwmon = find_hwmon("amdgpu")
-    
-    if gpu_hwmon is None:
-        return {
-            "error": "GPU sensor not found"
-        }
-    
-    return { 
-        "gpu_temperature": read_temp(f"{gpu_hwmon}/temp1_input")
-            
-        }
+    return get_hardware_temperature(
+        sensor_name="amdgpu",
+        temperature_key="gpu_temperature",
+        device_name="GPU"
+    )
 
 def read_gpu_stats(path):
     if path is None:
@@ -149,18 +164,23 @@ def read_gpu_stats(path):
 
 def get_gpu_metric(sensor_name, metric_key, error_message):
     """
-    Reads a GPU metric from the Linux sysfs interface and returns
-    either the metric value or an error dictionary.
+    Reads a GPU metric from the Linux sysfs interface.
+    Returns:
+        A dictionary containing the requested GPU metric.
+    Raises:
+        RuntimeError: If the GPU metric cannot be found or read.
     """
     # 1. Generate the string path
     path = find_gpu_info(sensor_name)
+    if path is None:
+        raise RuntimeError(f"{sensor_name} sensor not found")
     
     # 2. Attempt to read and parse the file contents
     value = read_gpu_stats(path)
     
     # 3. Handle errors based purely on the returned value
     if value is None:
-        return {"error": error_message}
+        raise RuntimeError(error_message)
         
     # 4. Success path returning a structured dictionary
     return {metric_key: value}
