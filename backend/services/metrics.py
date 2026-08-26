@@ -1,6 +1,10 @@
 import os
 import time
 
+from exceptions import (
+    SensorNotFoundError,
+    SensorReadingError
+)
 from models.metrics import CpuMetrics, GpuMetrics
 
 def get_vendor_id(vendor_path):
@@ -80,11 +84,11 @@ def find_hwmon(sensor_name):
 def get_hardware_temperature(sensor_name,temperature_key,device_name):
     sensor_path = find_hwmon(sensor_name)
     if sensor_path is None:
-        raise RuntimeError(f"{device_name} sensor could not be read")
+        raise SensorNotFoundError(f"{device_name} sensor not found")
     
     temperature = read_temp(f"{sensor_path}/temp1_input")
     if temperature is None:
-        raise RuntimeError(f"{device_name} temperature could not be read")
+        raise SensorReadingError(f"{device_name} temperature could not be read")
 
     return {temperature_key: temperature}
 
@@ -109,7 +113,7 @@ def get_cpu_time_readings():
     cpu_times = read_cpu_times()
     
     if cpu_times is None:
-        raise RuntimeError("CPU times could not be read")
+        raise SensorReadingError("CPU times could not be read")
     return cpu_times
 
 def get_cpu_usage():
@@ -168,19 +172,20 @@ def get_gpu_metric(sensor_name, metric_key, error_message):
     Returns:
         A dictionary containing the requested GPU metric.
     Raises:
-        RuntimeError: If the GPU metric cannot be found or read.
+        SensorNotFoundError: If the GPU metric cannot be found.
+        SensorReadingError: If the GPU metric could not be read.
     """
     # 1. Generate the string path
     path = find_gpu_info(sensor_name)
     if path is None:
-        raise RuntimeError(f"{sensor_name} sensor not found")
+        raise SensorNotFoundError(f"{sensor_name} sensor not found")
     
     # 2. Attempt to read and parse the file contents
     value = read_gpu_stats(path)
     
     # 3. Handle errors based purely on the returned value
     if value is None:
-        raise RuntimeError(error_message)
+        raise SensorReadingError(error_message)
         
     # 4. Success path returning a structured dictionary
     return {metric_key: value}
