@@ -1,11 +1,12 @@
 import os
-import time
 
 from exceptions import (
     SensorNotFoundError,
     SensorReadingError
 )
-from models.metrics import CpuMetrics, GpuMetrics
+from models.metrics import GpuMetrics
+
+from services.hardware import get_hardware_temperature
 
 def get_vendor_id(vendor_path):
     with open(vendor_path, "r") as f:
@@ -52,13 +53,6 @@ def find_amd_gpu_card():
 # Run the discovery once at startup.
 _AMD_GPU_BASE = find_amd_gpu_card()
 
-def read_temp(path):
-    try:
-        with open(path, "r") as f:
-            return round(int(f.read().strip()) / 1000, 1)
-    except Exception:
-        return None
-
 def find_gpu_info(sensor_name):
     # Seamlessly build the path using the cached base path
     if _AMD_GPU_BASE is None:
@@ -66,88 +60,6 @@ def find_gpu_info(sensor_name):
 
     return os.path.join(_AMD_GPU_BASE, "device", sensor_name)
 
-def find_hwmon(sensor_name):
-    hwmon_root = "/sys/class/hwmon"
-
-    for entry in os.listdir(hwmon_root):
-        name_file = os.path.join(hwmon_root, entry, "name")
-
-        try:
-            with open(name_file, "r") as f:
-                if f.read().strip() == sensor_name:
-                    return os.path.join(hwmon_root, entry)
-        except Exception:
-            continue
-
-    return None
-
-def get_hardware_temperature(sensor_name,temperature_key,device_name):
-    sensor_path = find_hwmon(sensor_name)
-    if sensor_path is None:
-        raise SensorNotFoundError(f"{device_name} sensor not found")
-    
-    temperature = read_temp(f"{sensor_path}/temp1_input")
-    if temperature is None:
-        raise SensorReadingError(f"{device_name} temperature could not be read")
-
-    return {temperature_key: temperature}
-
-def get_cpu_temperature():
-    return get_hardware_temperature(
-        sensor_name="k10temp",
-        temperature_key="cpu_temperature",
-        device_name="CPU"
-    )
-
-def read_cpu_times():
-        path = "/proc/stat"
-        try:
-            with open(path, "r") as f:
-                line = f.readline().strip()
-                return line.split()
-        except Exception:
-            return None
-        return None
-
-def get_cpu_time_readings():
-    cpu_times = read_cpu_times()
-    
-    if cpu_times is None:
-        raise SensorReadingError("CPU times could not be read")
-    return cpu_times
-
-def get_cpu_usage():
-
-    cpu_times = get_cpu_time_readings()
-    
-    # Read raw string data and immediately convert values to integers (skipping "cpu")
-    first = [int(x) for x in cpu_times[1:]]
-    
-    # Wait for the sample interval
-    time.sleep(0.1)
-
-    cpu_times = get_cpu_time_readings()
-
-    # Read second sample and immediately convert to integers (skipping "cpu")
-    second = [int(x) for x in cpu_times[1:]]
-    
-    # Perform calculations using pure integer arrays
-    # Note: Index 3 corresponds to the original index 4 ("idle") because we sliced off "cpu"
-    idle_diff = second[3] - first[3]
-    
-    # Calculate differences element-by-element
-    diffs = [b - a for a, b in zip(first, second)]
-    grand_total = sum(diffs)
-    
-    # Prevent division-by-zero error
-    if grand_total:
-        cpu_usage = (grand_total - idle_diff) / grand_total * 100
-    else:
-        cpu_usage = 0.0
-        
-    return {
-        "cpu_usage": round(cpu_usage, 1)
-    }
 
 def get_gpu_temperature():
     return get_hardware_temperature(
@@ -155,6 +67,7 @@ def get_gpu_temperature():
         temperature_key="gpu_temperature",
         device_name="GPU"
     )
+
 
 def read_gpu_stats(path):
     if path is None:
@@ -165,6 +78,7 @@ def read_gpu_stats(path):
             return int(f.read().strip())
     except Exception:
         return None
+
 
 def get_gpu_metric(sensor_name, metric_key, error_message):
     """
@@ -190,12 +104,14 @@ def get_gpu_metric(sensor_name, metric_key, error_message):
     # 4. Success path returning a structured dictionary
     return {metric_key: value}
 
+
 def get_gpu_usage():
     return get_gpu_metric(
         sensor_name="gpu_busy_percent",
         metric_key="gpu_usage",
         error_message="GPU sensor statistic could not be read"
     )
+
 
 def get_gpu_memory_usage():
     return get_gpu_metric(
@@ -204,13 +120,6 @@ def get_gpu_memory_usage():
         error_message="GPU memory statistic could not be read"
     )
 
-def get_cpu_metrics() -> CpuMetrics:
-    usage = get_cpu_usage()
-    cpu_temp = get_cpu_temperature()
-    return CpuMetrics(
-        usage=usage["cpu_usage"],
-        temperature=cpu_temp["cpu_temperature"]
-        )
 
 def get_gpu_metrics() -> GpuMetrics:
     gpu_temp = get_gpu_temperature()
