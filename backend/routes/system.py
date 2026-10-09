@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
-from services.metrics import get_cpu_metrics, get_gpu_metrics
+from services.metrics import get_gpu_metrics
+from services.cpu import get_cpu_metrics
 from models.metrics import CpuMetrics, GpuMetrics, SystemMetrics
 
 # Create the composition router instance

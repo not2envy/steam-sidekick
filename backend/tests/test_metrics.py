@@ -1,17 +1,18 @@
-from services.metrics import get_cpu_metrics, get_gpu_metrics
+from services.metrics import get_gpu_metrics
+from services.cpu import get_cpu_metrics
 from models.metrics import CpuMetrics, GpuMetrics
 
 
 def test_get_cpu_metrics_returns_cpu_metrics(mocker):
     # Arrange
-    # Pretend the CPU usage is 42.5%
+    # Pretend the CPU usage is 49%
     mocker.patch(
-        "services.metrics.get_cpu_usage",
+        "services.cpu._get_cpu_usage",
           return_value={"cpu_usage": 49}
           )
-    # Pretend the CPU temperature is 58.0°C
+    # Pretend the CPU temperature is 43°C
     mocker.patch(
-        "services.metrics.get_cpu_temperature",
+        "services.cpu._get_cpu_temperature",
           return_value={"cpu_temperature": 43}
           )
 
